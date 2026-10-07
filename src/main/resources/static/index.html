@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Community Events (demo)</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 10px; }
+    .box { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+    .ok { background: #d8f5dc; padding: 8px; }
+    .error { background: #fbd9d9; padding: 8px; }
+    label { display: block; margin: 6px 0; }
+    input, textarea { width: 100%; box-sizing: border-box; }
+    .small { color: #666; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<h1>Community Events</h1>
+
+<!-- 1. Role selector -->
+<div class="box">
+  Role:
+  <select id="role" onchange="changeRole()">
+    <option value="VISITOR">Visitor</option>
+    <option value="ORGANISER">Event Organiser</option>
+    <option value="ADMIN">Administrator</option>
+  </select>
+
+  <span id="userPart" style="display:none">
+    Organiser:
+    <select id="userId" onchange="loadEvents()">
+      <option>organiser-1</option>
+      <option>organiser-2</option>
+    </select>
+  </span>
+</div>
+
+<div id="message"></div>
+
+<!-- 2. Create / edit form -->
+<div id="formBox" class="box" style="display:none">
+  <h3 id="formTitle">Create event</h3>
+  <label>Title <input id="title"></label>
+  <label>Description <textarea id="description" rows="2"></textarea></label>
+  <label>Date and time <input id="dateTime" type="datetime-local"></label>
+  <label>Capacity <input id="capacity" type="number"></label>
+  <button onclick="saveEvent()" id="saveButton">Create</button>
+  <button onclick="clearForm()">Clear</button>
+  <p class="small">New events are PENDING_REVIEW and hidden from visitors until an administrator publishes them.</p>
+</div>
+
+<!-- 3. Events list -->
+<h2 id="listTitle">Events</h2>
+<div id="events"></div>
+
+<!-- 4. Small tool to test the registration rules -->
+<div class="box">
+  <h3>Registration tester</h3>
+  Event ID: <input id="testId" placeholder="EVT-1004" style="width:150px">
+  <button onclick="register(document.getElementById('testId').value)">Register anonymously</button>
+  <p class="small">Try EVT-1004 (not published) or EVT-1003 twice (capacity 1).</p>
+</div>
+
+<!-- 5. Activity list -->
+<h2>Activity</h2>
+<ul id="activities"></ul>
+
+<script>
+  var editingId = null;
+
+  // Small helper: find an element by id
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  // Calls the backend. Sends the demo role in headers.
+  async function callApi(path, method, body) {
+    var headers = {
+      "X-Role": $("role").value,
+      "X-User-Id": $("userId").value
+    };
+    var options = { method: method, headers: headers };
+    if (body) {
+      headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body);
+    }
+
+    var response = await fetch("/api" + path, options);
+    var data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Something went wrong");
+    }
+    return data;
+  }
+
+  function showMessage(text, isOk) {
+    $("message").textContent = text;          // textContent = shown as plain text, never as HTML
+    $("message").className = isOk ? "ok" : "error";
+  }
+
+  function changeRole() {
+    $("message").textContent = "";
+    $("message").className = "";
+    clearForm();
+    loadEvents();
+  }
+
+  // Loads events + activities and draws them
+  async function loadEvents() {
+    var role = $("role").value;
+
+    // show/hide parts of the page depending on the role
+    $("userPart").style.display = (role === "ORGANISER") ? "inline" : "none";
+    $("formBox").style.display = (role === "ORGANISER") ? "block" : "none";
+    if (role === "VISITOR") $("listTitle").textContent = "Published events";
+    if (role === "ORGANISER") $("listTitle").textContent = "My events";
+    if (role === "ADMIN") $("listTitle").textContent = "All events (including unpublished)";
+
+    try {
+      var events = await callApi("/events", "GET");
+      drawEvents(events, role);
+
+      var activities = await callApi("/activities", "GET");
+      drawActivities(activities);
+    } catch (error) {
+      showMessage(error.message, false);
+    }
+  }
+
+  function drawEvents(events, role) {
+    var container = $("events");
+    container.innerHTML = "";
+    if (events.length === 0) {
+      container.textContent = "No events.";
+      return;
+    }
+
+    for (var i = 0; i < events.length; i++) {
+      var event = events[i];
+
+      var box = document.createElement("div");
+      box.className = "box";
+
+      var heading = document.createElement("b");
+      heading.textContent = event.title + " [" + event.status + "]";
+      box.appendChild(heading);
+
+      var info = document.createElement("div");
+      info.className = "small";
+      info.textContent = event.id + " | " + event.dateTime.replace("T", " ").substring(0, 16) +
+          " | registered " + event.registeredCount + "/" + event.capacity + " | " + event.organiserId;
+      box.appendChild(info);
+
+      var description = document.createElement("p");
+      description.textContent = event.description || "";
+      box.appendChild(description);
+
+      // Visitor action: register
+      if (event.status === "PUBLISHED") {
+        box.appendChild(makeButton("Register interest", event.id, register));
+      }
+      // Admin action: publish pending events
+      if (role === "ADMIN" && event.status === "PENDING_REVIEW") {
+        box.appendChild(makeButton("Publish", event.id, publish));
+      }
+      // Organiser action: edit
+      if (role === "ORGANISER") {
+        var editButton = makeButton("Edit", event, startEdit);
+        box.appendChild(editButton);
+      }
+
+      container.appendChild(box);
+    }
+  }
+
+  function makeButton(text, value, action) {
+    var button = document.createElement("button");
+    button.textContent = text;
+    button.onclick = function () { action(value); };
+    return button;
+  }
+
+  function drawActivities(activities) {
+    var list = $("activities");
+    list.innerHTML = "";
+    for (var i = 0; i < activities.length; i++) {
+      var item = document.createElement("li");
+      item.textContent = activities[i].time.replace("T", " ").substring(0, 19) + " - " + activities[i].message;
+      list.appendChild(item);
+    }
+  }
+
+  // Visitor: register
+  async function register(eventId) {
+    try {
+      var registration = await callApi("/events/" + eventId + "/registrations", "POST");
+      showMessage("Registered! Anonymous registration ID: " + registration.id, true);
+    } catch (error) {
+      showMessage(error.message, false);
+    }
+    loadEvents();
+  }
+
+  // Admin: publish
+  async function publish(eventId) {
+    try {
+      await callApi("/events/" + eventId + "/publish", "POST");
+      showMessage("Event " + eventId + " was published.", true);
+    } catch (error) {
+      showMessage(error.message, false);
+    }
+    loadEvents();
+  }
+
+  // Organiser: create / edit
+  function startEdit(event) {
+    editingId = event.id;
+    $("title").value = event.title;
+    $("description").value = event.description;
+    $("dateTime").value = event.dateTime.substring(0, 16);
+    $("capacity").value = event.capacity;
+    $("formTitle").textContent = "Edit " + event.id;
+    $("saveButton").textContent = "Save changes";
+  }
+
+  function clearForm() {
+    editingId = null;
+    $("title").value = "";
+    $("description").value = "";
+    $("dateTime").value = "";
+    $("capacity").value = "";
+    $("formTitle").textContent = "Create event";
+    $("saveButton").textContent = "Create";
+  }
+
+  async function saveEvent() {
+    var body = {
+      title: $("title").value,
+      description: $("description").value,
+      dateTime: $("dateTime").value || null,
+      capacity: $("capacity").value === "" ? null : Number($("capacity").value)
+    };
+
+    try {
+      if (editingId === null) {
+        await callApi("/events", "POST", body);
+        showMessage("Event created. It is pending review.", true);
+      } else {
+        await callApi("/events/" + editingId, "PUT", body);
+        showMessage("Event updated.", true);
+      }
+      clearForm();
+    } catch (error) {
+      showMessage(error.message, false);
+    }
+    loadEvents();
+  }
+
+  loadEvents();
+</script>
+</body>
+</html>

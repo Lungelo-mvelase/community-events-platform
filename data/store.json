@@ -1,0 +1,41 @@
+{
+  "events" : [ {
+    "id" : "EVT-1001",
+    "title" : "Community Garden Day",
+    "description" : "Help plant vegetables.",
+    "dateTime" : "2026-10-21T22:00:00",
+    "capacity" : 20,
+    "registeredCount" : 0,
+    "status" : "PUBLISHED",
+    "organiserId" : "organiser-1"
+  }, {
+    "id" : "EVT-1002",
+    "title" : "Neighbourhood Book Swap",
+    "description" : "Bring a book, take a book.",
+    "dateTime" : "2026-10-23T22:00:00",
+    "capacity" : 15,
+    "registeredCount" : 0,
+    "status" : "PENDING_REVIEW",
+    "organiserId" : "organiser-1"
+  }, {
+    "id" : "EVT-1003",
+    "title" : "Tiny Workshop",
+    "description" : "Financial advice session",
+    "dateTime" : "2026-10-24T22:00:00",
+    "capacity" : 10,
+    "registeredCount" : 0,
+    "status" : "PUBLISHED",
+    "organiserId" : "organiser-2"
+  }, {
+    "id" : "EVT-1004",
+    "title" : "Open Mic Night",
+    "description" : "An evening of music and poetry.",
+    "dateTime" : "2026-10-26T22:00:00",
+    "capacity" : 50,
+    "registeredCount" : 0,
+    "status" : "PENDING_REVIEW",
+    "organiserId" : "organiser-2"
+  } ],
+  "registrations" : [ ],
+  "activities" : [ ]
+}
