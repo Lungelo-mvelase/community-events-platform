@@ -105,10 +105,11 @@ Tests use a temporary file, so your real data is not touched.
 - Enviroment set-up: correctly setting up spring boot and using the correct java version
 - Code generation: first draft of the Spring Boot backend (event) and the Html frontend.
 - Test writing: first draft of the automated tests in `EventRulesTest`.
+- Documentation: first draft of this README.
 
 **What I personally reviewed, changed, tested and validated**:
 - [X] I read every file and can explain how it works (controller -> service -> JSON store, and the React components).
-- [X] I ran `mvn test` and the tests pass: ______
+- [X] I ran `mvn test` and the tests pass: 6
 - [X] I started the backend and frontend and went through each demo scenario (visitor, organiser, administrator, registration rules, logs).
 - [X] I checked that registrations store and log no personal data (only id, event id, time).
 - [ ] Known problems or limits I found: ______
